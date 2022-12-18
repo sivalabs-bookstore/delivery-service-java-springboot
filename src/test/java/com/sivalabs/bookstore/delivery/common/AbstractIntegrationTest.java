@@ -16,7 +16,7 @@ public abstract class AbstractIntegrationTest {
 
     protected static final MongoDBContainer mongodb = new MongoDBContainer("mongo:4.2");
     protected static final KafkaContainer kafka =
-            new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.2.1"));
+            new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.3.0"));
 
     @BeforeAll
     static void beforeAll() {

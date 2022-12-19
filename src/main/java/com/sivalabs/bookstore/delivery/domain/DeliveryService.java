@@ -7,12 +7,13 @@ import com.sivalabs.bookstore.delivery.events.model.OrderCreatedEvent;
 import com.sivalabs.bookstore.delivery.events.model.OrderDeliveredEvent;
 import com.sivalabs.bookstore.delivery.events.model.OrderErrorEvent;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
-@RequiredArgsConstructor
 public class DeliveryService {
+    private static final Logger logger = LoggerFactory.getLogger(DeliveryService.class);
     private static final List<String> DELIVERY_ALLOWED_COUNTRIES =
             List.of("INDIA", "USA", "GERMANY", "UK");
 
@@ -20,62 +21,62 @@ public class DeliveryService {
     private final KafkaHelper kafkaHelper;
     private final ApplicationProperties properties;
 
+    public DeliveryService(
+            OrderRepository orderRepository,
+            KafkaHelper kafkaHelper,
+            ApplicationProperties properties) {
+        this.orderRepository = orderRepository;
+        this.kafkaHelper = kafkaHelper;
+        this.properties = properties;
+    }
+
     public void process(OrderCreatedEvent event) {
         try {
             if (canBeDelivered(event)) {
-                this.updateOrderStatus(event.getOrderId(), Order.OrderStatus.DELIVERED);
+                logger.info("OrderId: {} can be delivered", event.orderId());
+                this.updateOrderStatus(event.orderId(), OrderStatus.DELIVERED);
                 kafkaHelper.send(
                         properties.deliveredOrdersTopic(), buildOrderDeliveredEvent(event));
+                logger.info("Published OrderDelivered event with OrderId: {}", event.orderId());
             } else {
-                this.updateOrderStatus(event.getOrderId(), Order.OrderStatus.CANCELLED);
+                logger.info("OrderId: {} can not be delivered", event.orderId());
+                this.updateOrderStatus(event.orderId(), OrderStatus.CANCELLED);
                 kafkaHelper.send(
                         properties.cancelledOrdersTopic(),
                         buildOrderCancelledEvent(event, "Can't deliver to the location"));
+                logger.info("Published OrderCancelled event with OrderId: {}", event.orderId());
             }
         } catch (RuntimeException e) {
-            this.updateOrderStatus(event.getOrderId(), Order.OrderStatus.ERROR);
+            logger.error("Failed to process OrderCreatedEvent with orderId: " + event.orderId(), e);
+            this.updateOrderStatus(event.orderId(), OrderStatus.ERROR);
             kafkaHelper.send(
-                    properties.cancelledOrdersTopic(), buildOrderErrorEvent(event, e.getMessage()));
+                    properties.errorOrdersTopic(), buildOrderErrorEvent(event, e.getMessage()));
+            logger.info("Published OrderError event with OrderId: {}", event.orderId());
         }
     }
 
-    private void updateOrderStatus(String orderId, Order.OrderStatus status) {
+    private void updateOrderStatus(String orderId, OrderStatus status) {
         Order order = orderRepository.findByOrderId(orderId).orElseThrow();
         order.setStatus(status);
         orderRepository.save(order);
     }
 
     private boolean canBeDelivered(OrderCreatedEvent order) {
-        return DELIVERY_ALLOWED_COUNTRIES.contains(
-                order.getDeliveryAddress().getCountry().toUpperCase());
+        return DELIVERY_ALLOWED_COUNTRIES.contains(order.deliveryAddress().country().toUpperCase());
     }
 
     private OrderDeliveredEvent buildOrderDeliveredEvent(OrderCreatedEvent order) {
-        OrderDeliveredEvent event = new OrderDeliveredEvent();
-        event.setOrderId(order.getOrderId());
-        event.setCustomer(order.getCustomer());
-        event.setDeliveryAddress(order.getDeliveryAddress());
-        event.setItems(order.getItems());
-        return event;
+        return new OrderDeliveredEvent(
+                order.orderId(), order.items(), order.customer(), order.deliveryAddress());
     }
 
     private OrderCancelledEvent buildOrderCancelledEvent(OrderCreatedEvent order, String reason) {
-        OrderCancelledEvent event = new OrderCancelledEvent();
-        event.setOrderId(order.getOrderId());
-        event.setReason(reason);
-        event.setCustomer(order.getCustomer());
-        event.setDeliveryAddress(order.getDeliveryAddress());
-        event.setItems(order.getItems());
-        return event;
+        return new OrderCancelledEvent(
+                order.orderId(), order.items(), order.customer(), order.deliveryAddress(), reason);
     }
 
     private OrderErrorEvent buildOrderErrorEvent(OrderCreatedEvent order, String reason) {
-        OrderErrorEvent event = new OrderErrorEvent();
-        event.setOrderId(order.getOrderId());
-        event.setReason(reason);
-        event.setCustomer(order.getCustomer());
-        event.setDeliveryAddress(order.getDeliveryAddress());
-        event.setItems(order.getItems());
-        return event;
+        return new OrderErrorEvent(
+                order.orderId(), order.items(), order.customer(), order.deliveryAddress(), reason);
     }
 }

@@ -1,19 +1,11 @@
 package com.sivalabs.bookstore.delivery.events.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import jakarta.validation.constraints.NotBlank;
 
-@Setter
-@Getter
-@NoArgsConstructor
-@AllArgsConstructor
-public class Address {
-    private String addressLine1;
-    private String addressLine2;
-    private String city;
-    private String state;
-    private String zipCode;
-    private String country;
-}
+public record Address(
+        @NotBlank(message = "AddressLine1 is required") String addressLine1,
+        String addressLine2,
+        @NotBlank(message = "City is required") String city,
+        @NotBlank(message = "State is required") String state,
+        @NotBlank(message = "ZipCode is required") String zipCode,
+        @NotBlank(message = "Country is required") String country) {}

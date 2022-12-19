@@ -5,28 +5,40 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sivalabs.bookstore.delivery.domain.DeliveryService;
 import com.sivalabs.bookstore.delivery.domain.Order;
 import com.sivalabs.bookstore.delivery.domain.OrderRepository;
+import com.sivalabs.bookstore.delivery.domain.OrderStatus;
 import com.sivalabs.bookstore.delivery.events.model.OrderCreatedEvent;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 @Service
-@RequiredArgsConstructor
-@Slf4j
 public class OrderProcessingJob {
+    private static final Logger log = LoggerFactory.getLogger(OrderProcessingJob.class);
     private final OrderRepository orderRepository;
     private final DeliveryService deliveryService;
     private final ObjectMapper objectMapper;
 
+    public OrderProcessingJob(
+            OrderRepository orderRepository,
+            DeliveryService deliveryService,
+            ObjectMapper objectMapper) {
+        this.orderRepository = orderRepository;
+        this.deliveryService = deliveryService;
+        this.objectMapper = objectMapper;
+    }
+
     @Scheduled(fixedDelay = 60000)
     public void processOrders() {
-        List<Order> orders = orderRepository.findByStatus(Order.OrderStatus.READY_TO_SHIP);
+        log.info("Processing READY_TO_SHIP orders");
+        List<Order> orders = orderRepository.findByStatus(OrderStatus.READY_TO_SHIP);
         if (orders.isEmpty()) {
             return;
         }
+        log.info("Found {} READY_TO_SHIP orders", orders.size());
         for (Order order : orders) {
+            log.info("Processing OrderId: {}", order.getOrderId());
             OrderCreatedEvent orderCreatedEvent = getOrderCreatedEvent(order);
             deliveryService.process(orderCreatedEvent);
         }

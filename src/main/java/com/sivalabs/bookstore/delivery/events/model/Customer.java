@@ -1,16 +1,9 @@
 package com.sivalabs.bookstore.delivery.events.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 
-@Setter
-@Getter
-@NoArgsConstructor
-@AllArgsConstructor
-public class Customer {
-    private String name;
-    private String email;
-    private String phone;
-}
+public record Customer(
+        @NotBlank(message = "Customer Name is required") String name,
+        @NotBlank(message = "Customer email is required") @Email String email,
+        @NotBlank(message = "Customer Phone number is required") String phone) {}
